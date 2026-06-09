@@ -1,13 +1,13 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# Sample movie data
-import streamlit as st
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
+st.set_page_config(
+    page_title="Movie Recommendation System",
+    page_icon="🎬"
+)
 
 st.title("🎬 Movie Recommendation System")
 
@@ -22,14 +22,14 @@ movies = [
     "The Martian is about survival in space"
 ]
 
-# Load model (cached so it loads only once)
+# Load model once
 @st.cache_resource
 def load_model():
     return SentenceTransformer("all-MiniLM-L6-v2")
 
 model = load_model()
 
-# Generate embeddings (cached)
+# Generate movie embeddings once
 @st.cache_data
 def get_embeddings():
     return model.encode(movies)
@@ -38,30 +38,47 @@ embeddings = get_embeddings()
 
 # User input
 query = st.text_input(
-    "Describe the type of movie you want:",
-    placeholder="e.g. superhero, space adventure, romance"
+    "Describe the movie you want",
+    placeholder="e.g. superhero, romance, space adventure"
 )
 
-if st.button("Recommend Movies"):
+if st.button("Recommend"):
 
     if query.strip():
 
+        # Query embedding
         query_embedding = model.encode([query])
 
+        # Similarity scores
         scores = cosine_similarity(
             embeddings,
             query_embedding
         ).flatten()
 
-        top_indices = np.argsort(scores)[::-1][:3]
+        # DataFrame
+        df = pd.DataFrame({
+            "Movie": movies,
+            "Similarity": scores
+        })
 
-        st.subheader("Top Recommendations")
+        # Sort by similarity
+        df = df.sort_values(
+            by="Similarity",
+            ascending=False
+        ).reset_index(drop=True)
 
-        for i, idx in enumerate(top_indices, start=1):
+        # Top recommendations
+        st.subheader("🏆 Top 3 Recommendations")
+
+        for i in range(min(3, len(df))):
             st.write(
-                f"**{i}.** {movies[idx]} "
-                f"(Similarity: {scores[idx]:.3f})"
+                f"**{i+1}. {df.loc[i, 'Movie']}** "
+                f"(Score: {df.loc[i, 'Similarity']:.4f})"
             )
+
+        # Full similarity table
+        st.subheader("📊 Similarity Scores")
+        st.dataframe(df, use_container_width=True)
 
     else:
         st.warning("Please enter a movie preference.")
